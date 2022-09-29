@@ -1,10 +1,10 @@
 import argparse
 import csv
 import json
-from pandas import read_csv
 from zipfile import ZipFile
 import os
 import datetime
+from collections import defaultdict
 
 
 class Log:
@@ -55,7 +55,7 @@ class Out:
                 json.dump(content, file)
 
 
-def read_fcsv(fpath):
+def read_csv_to_ldict(fpath):
     reader = csv.DictReader(open(fpath, 'r'))
     return list(reader)
 
@@ -97,31 +97,33 @@ def getentries(coci_dir, dois_csv, log, tmp, out):
         if archive_name.endswith("zip") and archive_name not in bkup_f_index:
             archive_path = os.path.join(coci_dir, archive_name)
             log.w_log("PROCESSING_FILE: "+archive_name)
-            file_dois = dict()
+            tmp_index = defaultdict(list)
             with ZipFile(archive_path) as archive:
                 for csv_name in archive.namelist():
                     with archive.open(csv_name) as csv_file:
-                        df_data = read_csv(csv_file, encoding='utf-8')
-                        # Process the CSV here
-                        for k_doi in index_dois:
-                            #if k_doi not in checked_index:
-                            cits = df_data[df_data['citing']
-                                           == k_doi].to_dict('records')
-                            refs = df_data[df_data['cited']
-                                           == k_doi].to_dict('records')
-                            index_dois[k_doi]["citations"] += cits
-                            index_dois[k_doi]["references"] += refs
+                        l_cits = read_csv_to_ldict(csv_file)
 
-                            if len(cits) > 0 or len(refs) > 0:
-                                # update global index
-                                file_dois[k_doi] = dict()
-                                file_dois[k_doi]["citations"] = cits
-                                file_dois[k_doi]["references"] = refs
-                                log.w_log("DOI_FOUND: "+k_doi)
-                                #checked_index.add(k_doi)
+                        for item in l_cits:
+
+                            # check if "citing" or "cited" value is in index_dois
+                            if item["citing"] in index_dois:
+                                index_dois[item["citing"]
+                                           ]["citations"].append(item)
+                                if item["citing"] not in tmp_index:
+                                    log.w_log("DOI_FOUND: "+item["citing"])
+                                tmp_index[item["citing"]
+                                          ]["citations"].append(item)
+
+                            if item["cited"] in index_dois:
+                                index_dois[item["cited"]
+                                           ]["references"].append(item)
+                                if item["cited"] not in tmp_index:
+                                    log.w_log("DOI_FOUND: "+item["cited"])
+                                tmp_index[item["cited"]
+                                          ]["references"].append(item)
 
             tmp.w_tmpfile(
-                "part_"+archive_name.replace(".zip", "")+".json", file_dois)
+                "part_"+archive_name.replace(".zip", "")+".json", tmp_index)
 
     out.w_outfile("res.json", index_dois)
 
