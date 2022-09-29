@@ -1,1 +1,1 @@
-# proc_index_dump
+# Scripts to process the citation indexes dump of OpenCitations 
