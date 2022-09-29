@@ -1,4 +1,4 @@
-data
+data*
 .log
 .tmp
-out
+out*

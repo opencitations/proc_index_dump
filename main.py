@@ -134,13 +134,17 @@ parser.add_argument('--coci', type=str, required=True,
                     help='path to the dir of the COCI dump (inner files all zipped)')
 parser.add_argument('--getentries', type=str, required=False,
                     help='path to the CSV file containing a list of DOIs')
+parser.add_argument('--job', type=str, required=False,
+                    help='the ID of the job (used to backup previous processed data)')
 args = parser.parse_args()
 
 if args.getentries:
-    f_input = args.getentries.split("/")[-1]
-    getentries(args.coci, args.getentries, Log("getentries_"+f_input),
-               Tmp("getentries_"+f_input), Out("getentries_"+f_input))
+    job = "NULL"
+    if args.job:
+        job = args.job
+    getentries(args.coci, args.getentries, Log("getentries_"+job),
+               Tmp("getentries_"+job), Out("getentries_"+job))
 
 print("done!")
 # running example:
-# nohup python proc_coci.py --coci /srv/data/coci/17 --getentries data/all_aabc_and_rsbmt.txt &
+# nohup python main.py --coci /srv/data/coci/17 --getentries ../data/all_aabc_and_rsbmt.txt --job 1&
