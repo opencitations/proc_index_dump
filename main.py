@@ -4,7 +4,7 @@ import json
 from zipfile import ZipFile
 import os
 import datetime
-from collections import defaultdict
+import io
 
 
 class Log:
@@ -13,8 +13,9 @@ class Log:
         if not os.path.exists(self.dir):
             os.makedirs(self.dir)
 
-        time = str(datetime.datetime.now()).replace(" ", "_")
-        self.flog = self.dir+"/"+pname+"_"+time+".log"
+        #time = str(datetime.datetime.now()).replace(" ", "_")
+        #self.flog = self.dir+"/"+pname+"_"+time+".log"
+        self.flog = self.dir+"/"+pname+".log"
         if not os.path.exists(self.flog):
             with open(self.flog, 'w') as f:
                 f.write("time,msg")
@@ -56,13 +57,13 @@ class Out:
 
 
 def read_csv_to_ldict(fpath):
-    reader = csv.DictReader(open(fpath, 'r'))
+    reader = csv.DictReader(io.TextIOWrapper(fpath))
     return list(reader)
 
 
 def getentries(coci_dir, dois_csv, log, tmp, out):
 
-    # init the given list of DOIs as dict
+    # Init the output
     index_dois = dict()
     with open(dois_csv, 'r') as data:
         for line in csv.reader(data):
@@ -73,13 +74,14 @@ def getentries(coci_dir, dois_csv, log, tmp, out):
             index_dois[doi_val]["citations"] = []
             index_dois[doi_val]["references"] = []
 
-    # backup
+    # Handle backup
+    # ---
     checked_index = set()
     bkup_f_index = set()
-    log.w_log("BACKUP")
     for bkup_f in os.listdir(tmp.procdir):
-        # bkup_f = part_2020-01-13T19_31_19_1-4.zip
+        # bkup_f = part_2020-01-13T19_31_19_1-4.json
         if bkup_f.endswith("json") and bkup_f.startswith("part_"):
+            log.w_log("BACKUP_FILE: " + str(bkup_f))
             zip_f_name = bkup_f.split(".")[0].replace("part_", "")+".zip"
             bkup_f_index.add(zip_f_name)
             for k, v in json.load(open(tmp.procdir+"/"+bkup_f)).items():
@@ -88,8 +90,7 @@ def getentries(coci_dir, dois_csv, log, tmp, out):
                 if len(v["citations"]) > 0 or len(v["references"]) > 0:
                     checked_index.add(k)
 
-        log.w_log("BACKUP_FILES_DONE: " + str(len(bkup_f_index)))
-        log.w_log("BACKUP_DOIS_FOUND: " + str(len(checked_index)))
+            log.w_log("BACKUP_DOIS: " + str(len(checked_index)))
 
     # read the dump of COCI
     log.w_log("RUNNING_PROC")
@@ -97,30 +98,36 @@ def getentries(coci_dir, dois_csv, log, tmp, out):
         if archive_name.endswith("zip") and archive_name not in bkup_f_index:
             archive_path = os.path.join(coci_dir, archive_name)
             log.w_log("PROCESSING_FILE: "+archive_name)
-            tmp_index = defaultdict(list)
+            tmp_index = dict()
             with ZipFile(archive_path) as archive:
                 for csv_name in archive.namelist():
                     with archive.open(csv_name) as csv_file:
+                        print(csv_file)
                         l_cits = read_csv_to_ldict(csv_file)
+                        #df_data = read_csv(csv_file, encoding='utf-8')
 
                         for item in l_cits:
 
                             # check if "citing" or "cited" value is in index_dois
                             if item["citing"] in index_dois:
                                 index_dois[item["citing"]
-                                           ]["citations"].append(item)
+                                           ]["references"].append(item)
                                 if item["citing"] not in tmp_index:
+                                    tmp_index[item["citing"]] = {
+                                        "citations": [], "references": []}
                                     log.w_log("DOI_FOUND: "+item["citing"])
                                 tmp_index[item["citing"]
-                                          ]["citations"].append(item)
+                                          ]["references"].append(item)
 
                             if item["cited"] in index_dois:
                                 index_dois[item["cited"]
-                                           ]["references"].append(item)
+                                           ]["citations"].append(item)
                                 if item["cited"] not in tmp_index:
+                                    tmp_index[item["cited"]] = {
+                                        "citations": [], "references": []}
                                     log.w_log("DOI_FOUND: "+item["cited"])
                                 tmp_index[item["cited"]
-                                          ]["references"].append(item)
+                                          ]["citations"].append(item)
 
             tmp.w_tmpfile(
                 "part_"+archive_name.replace(".zip", "")+".json", tmp_index)
