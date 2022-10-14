@@ -1,1 +1,1 @@
-# Scripts to process the citation indexes dump of OpenCitations 
+# Scripts to process the the dump of OpenCitations indexes  
