@@ -3,3 +3,4 @@ data*
 .tmp
 out*
 _private
+.DS_Store
